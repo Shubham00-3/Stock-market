@@ -23,8 +23,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize FastMCP server - bind to 0.0.0.0 for Railway networking
-mcp = FastMCP("Market Intelligence Tools", host="0.0.0.0", port=8000)
+# Initialize FastMCP server - bind using HOST/PORT env vars for Railway networking
+port = int(os.getenv("PORT", "8000"))
+host = os.getenv("HOST", "0.0.0.0")
+mcp = FastMCP("Market Intelligence Tools", host=host, port=port)
 
 # Valid periods for historical data
 VALID_PERIODS = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "ytd", "max"]
@@ -332,7 +334,7 @@ async def get_market_summary() -> dict:
 
 if __name__ == "__main__":
     logger.info("Starting Market Intelligence MCP Server")
-    logger.info(f"Transport: streamable-http on port 8000 (binding to 0.0.0.0)")
+    logger.info(f"Transport: streamable-http on port {port} (binding to {host})")
     
     # Run the FastMCP server
     mcp.run(transport="streamable-http")

@@ -10,8 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire backend directory
 COPY . .
 
-# Expose port
-EXPOSE 8080
+# Railway auto-detects the port from the app
+# No EXPOSE needed - will use PORT environment variable
 
 # Run the application
 CMD ["python", "main.py"]

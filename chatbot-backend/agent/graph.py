@@ -61,9 +61,8 @@ class MarketIntelligenceAgent:
             max_tokens=2048
         )
         
-        # Initialize MCP client
-        transport = os.getenv("MCP_TRANSPORT_PROTOCOL", "http")
-        self.mcp_client = MCPClientWrapper(transport_protocol=transport)
+        # Initialize MCP client (HTTP transport only for Railway)
+        self.mcp_client = MCPClientWrapper()
         
         # Initialize cache
         self.cache = ResponseCache(default_ttl=300)  # 5 minute cache

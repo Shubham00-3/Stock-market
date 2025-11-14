@@ -1,12 +1,9 @@
 """MCP Client wrapper for connecting to the tool server."""
 import os
-import sys
 import logging
-import asyncio
 from typing import Any, Optional
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 logger = logging.getLogger(__name__)
@@ -15,24 +12,16 @@ logger = logging.getLogger(__name__)
 class MCPClientWrapper:
     """Wrapper for MCP client to connect to tool server."""
     
-    def __init__(self, transport_protocol: str = "http"):
-        """
-        Initialize MCP client wrapper.
-        
-        Args:
-            transport_protocol: "stdio" for local process or "http" for remote server
-        """
-        self.transport_protocol = transport_protocol
+    def __init__(self):
+        """Initialize MCP client wrapper for HTTP transport."""
         self.session: Optional[ClientSession] = None
         self.tools_cache: list = []
         self._context = None
-        self._exit_stack = []
-        self._stdio_context = None
         self._http_context = None
         self._session_context = None
         self._is_connected = False
         
-        logger.info(f"Initializing MCP client with transport: {transport_protocol}")
+        logger.info("Initializing MCP client with HTTP transport")
     
     async def connect(self):
         """Connect to MCP server and initialize session."""
@@ -41,52 +30,26 @@ class MCPClientWrapper:
             return
             
         try:
-            if self.transport_protocol == "stdio":
-                # Local stdio connection
-                server_path = os.getenv("MCP_SERVER_PATH", "../mcp_server_remote.py")
-                python_path = os.getenv("PYTHON_PATH", sys.executable)
-                
-                logger.info(f"Connecting to MCP server via stdio: {server_path}")
-                
-                server_params = StdioServerParameters(
-                    command=python_path,
-                    args=[server_path],
-                    env=None
-                )
-                
-                # Create stdio client context
-                self._stdio_context = stdio_client(server_params)
-                self._context = await self._stdio_context.__aenter__()
-                read, write = self._context
-                
-                # Create session
-                self._session_context = ClientSession(read, write)
-                self.session = await self._session_context.__aenter__()
-                
-            elif self.transport_protocol == "http":
-                # Remote HTTP connection
-                server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
-                
-                logger.info(f"Connecting to MCP server via HTTP: {server_url}")
-                
-                # Create HTTP client context - streamablehttp_client yields (read, write, session_info)
-                self._http_context = streamablehttp_client(server_url)
-                context_result = await self._http_context.__aenter__()
-                
-                # HTTP client returns a 3-tuple: (read, write, session_info)
-                if len(context_result) == 3:
-                    read, write, _session_info = context_result
-                else:
-                    read, write = context_result
-                    
-                self._context = context_result
-                
-                # Create session
-                self._session_context = ClientSession(read, write)
-                self.session = await self._session_context.__aenter__()
-                
+            # Remote HTTP connection
+            server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
+            
+            logger.info(f"Connecting to MCP server via HTTP: {server_url}")
+            
+            # Create HTTP client context - streamablehttp_client yields (read, write, session_info)
+            self._http_context = streamablehttp_client(server_url)
+            context_result = await self._http_context.__aenter__()
+            
+            # HTTP client returns a 3-tuple: (read, write, session_info)
+            if len(context_result) == 3:
+                read, write, _session_info = context_result
             else:
-                raise ValueError(f"Unknown transport protocol: {self.transport_protocol}")
+                read, write = context_result
+                
+            self._context = context_result
+            
+            # Create session
+            self._session_context = ClientSession(read, write)
+            self.session = await self._session_context.__aenter__()
             
             # Initialize session
             await self.session.initialize()
@@ -127,16 +90,7 @@ class MCPClientWrapper:
                     self._session_context = None
                     self.session = None
             
-            # Close transport context
-            if self._stdio_context is not None:
-                try:
-                    await self._stdio_context.__aexit__(None, None, None)
-                    logger.debug("Closed stdio context")
-                except Exception as e:
-                    logger.error(f"Error closing stdio context: {str(e)}")
-                finally:
-                    self._stdio_context = None
-                    
+            # Close HTTP transport context
             if self._http_context is not None:
                 try:
                     await self._http_context.__aexit__(None, None, None)

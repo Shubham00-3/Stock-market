@@ -278,10 +278,18 @@ async def stream(request: QueryRequest):
                 
                 # Stream agent responses
                 async for event in agent.stream(request.message, session_id):
-                    # Format event for SSE
+                    # Format event for SSE - handle different event types
+                    if isinstance(event, dict):
+                        content = event
+                    elif isinstance(event, str):
+                        content = event
+                    else:
+                        # Handle LangChain objects (AIMessage, etc.)
+                        content = str(event.content) if hasattr(event, 'content') else str(event)
+                    
                     event_data = {
                         "type": "update",
-                        "content": event
+                        "content": content
                     }
                     
                     yield {

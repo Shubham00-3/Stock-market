@@ -113,7 +113,7 @@ class MCPClientWrapper:
     
     async def call_tool(self, tool_name: str, arguments: dict) -> Any:
         """
-        Call a tool on the MCP server.
+        Call a tool on the MCP server with automatic session recovery.
         
         Args:
             tool_name: Name of the tool to call
@@ -122,8 +122,14 @@ class MCPClientWrapper:
         Returns:
             Tool execution result
         """
-        if not self.session:
-            raise RuntimeError("MCP session not initialized. Use 'async with' context manager.")
+        # Check if session is valid, reconnect if needed
+        if not self.session or not self._is_connected:
+            logger.warning("MCP session not initialized or lost, attempting to reconnect...")
+            try:
+                await self.disconnect()
+                await self.connect()
+            except Exception as e:
+                raise RuntimeError(f"Failed to reconnect MCP session: {str(e)}")
         
         try:
             logger.info(f"Calling tool: {tool_name} with args: {arguments}")
@@ -135,6 +141,8 @@ class MCPClientWrapper:
             
         except Exception as e:
             logger.error(f"Error calling tool {tool_name}: {str(e)}")
+            # Mark session as disconnected on error so next call attempts reconnect
+            self._is_connected = False
             raise
     
     def get_tools_for_llm(self) -> list[dict]:
